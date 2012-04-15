@@ -1,0 +1,41 @@
+<PXML xmlns="http://openpandora.org/namespaces/PXML">
+ 	<package id="ballion-jur.001">
+ 		<author name="Juergen Urban" website="http://mitglied.multimania.de/ps2dev/ballion.html"/>
+ 		<version major="2" minor="1" release="1" build="1" type="release"/>
+ 		<titles>
+ 			<title lang="en_US">
+				Ballion
+ 			</title>
+ 		</titles>
+ 		<descriptions>
+ 			<description lang="en_US">
+				Ballion is based on the C64 game Crillion. This is an Breakout clone where you have to destroy blocks with a ball.
+ 			</description>
+ 		</descriptions>
+ 		<icon src="./icon.png"/>
+ 	</package>
+ 	<application id="ballion-jur.001" appdata="ballion">
+ 		<author name="Juergen Urban" website="http://mitglied.multimania.de/ps2dev/ballion.html"/>
+ 		<version major="2" minor="1" release="1" build="1" type="release"/>
+ 		<title lang="en_US">
+			Ballion
+ 		</title>
+ 		<description lang="en_US">
+			Ballion is based on the C64 game Crillion. This is an Breakout clone where you have to destroy blocks with a ball. If you copy a file music.mp3 to pandora/appdata/ballion/sound/, it will play the music. You can copy your own created levels to pandora/appdata/ballion/levels. The file for the first level is "level00". You need to extract the ballion.pnd to get the existing levels and a description of the binary format.
+ 		</description>
+ 		<icon src="./icon.png"/>
+ 		<exec command="ballion" background="0" standalone="1" x11="req"/>
+ 		<osversion major="2" minor="1" release="0" build="0"/>
+ 		<licenses>
+ 			<license name="GPLv2" url="http://www.gnu.org/licenses/gpl-2.0.html" sourcecodeurl="http://mitglied.multimania.de/ps2dev/ballion.html"/>
+ 		</licenses>
+ 		<previewpics>
+ 			<pic src="./screenshot.png"/>
+ 		</previewpics>
+		<categories>
+			<category name="Game">
+				<subcategory name="BlocksGame"/>
+			</category>
+		</categories>
+	</application>
+</PXML>

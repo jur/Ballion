@@ -1,0 +1,25 @@
+The files in directory levels have the following format:
+
+#define MAX_LEVEL_SIZE (40 * 32)
+
+typedef struct level_header
+{
+    int width;
+    int height;
+    int startX;
+    int startY;
+    int startColor;
+    int startDirection;
+    int reserved1;
+    int reserved2;
+    unsigned char data[MAX_LEVEL_SIZE];
+} __attribute__((packed)) level_header_t;
+
+The level data are accessed as follows:
+level.data[x * height + y]
+Each byte in data represents a block. The byte tells the
+number of the block in the file resources/block.png.
+startX and startY are the start position of the ball.
+startColor is the color of the ball.
+startDirection is the direction of the ball at level
+entry (+1 or -1).

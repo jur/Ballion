@@ -1,0 +1,12 @@
+export PATH="$PNDSDK/bin:$PNDSDK/usr/bin:$PATH"
+export CROSS=pandora-
+export CC=${CROSS}gcc
+export CXX=${CROSS}g++
+export CPP=${CROSS}cpp
+export LD=${CROSS}ld
+export NM=${CROSS}nm
+export OBJDUMP=${CROSS}objdump
+export OBJCOPY=${CROSS}objcopy
+export RANLIB=${CROSS}ranlib
+export SDL_CONFIG=sdl-config
+export EXTENSION=

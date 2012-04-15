@@ -1,0 +1,11 @@
+export CROSS=i586-mingw32msvc-
+export CC=${CROSS}gcc
+export CXX=${CROSS}g++
+export CPP=${CROSS}cpp
+export LD=${CROSS}ld
+export NM=${CROSS}nm
+export OBJDUMP=${CROSS}objdump
+export OBJCOPY=${CROSS}objcopy
+export RANLIB=${CROSS}ranlib
+export SDL_CONFIG=/usr/i586-mingw32msvc/bin/${CROSS}sdl-config
+export EXTENSION=.exe
