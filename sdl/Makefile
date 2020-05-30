@@ -25,7 +25,9 @@ MODS		+= $(subst .,_,$(notdir $(ROM_FILES)))
 MODS		+= pngloader rom font menu sdl/gamecontrol
 MODS		+= sdl/utils
 OBJS		= $(addprefix $(OBJDIR)/, $(addsuffix .o, $(MODS)))
-LIBS		= -lm -L$(HOME)/mysrc/local/lib -lmad
+LIBS		= -lm
+LIBS		+= -L$(HOME)/mysrc/local/lib -lmad
+LIBS		+= -lpthread
 ifeq ($(DEBUG),yes)
 CFLAGS		+= -DDEBUG
 CXXFLAGS	+= -DDEBUG
