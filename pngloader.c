@@ -7,6 +7,40 @@
 #include "graphic.h"
 #include "config.h"
 
+#if PNG_LIBPNG_VER > 10400
+
+#define png_infopp_NULL (png_infopp)NULL
+#define png_voidp_NULL (png_infopp)NULL
+
+#else
+
+static png_voidp png_get_io_ptr(png_const_structrp png_ptr)
+{
+	return png_ptr->io_ptr;
+}
+
+static png_uint_32 png_get_image_width(png_const_structrp png_ptr, png_const_inforp info_ptr)
+{
+	return info_ptr->width;
+}
+
+static png_uint_32 png_get_image_height(png_const_structrp png_ptr, png_const_inforp info_ptr)
+{
+	return info_ptr->height;
+}
+
+static png_byte png_get_bit_depth(png_const_structrp png_ptr, png_const_inforp info_ptr)
+{
+	return info_ptr->pixel_depth;
+}
+
+static png_byte, png_get_color_type(png_const_structrp png_ptr, png_const_inforp info_ptr)
+{
+	return info_ptr->color_type;
+}
+
+#endif
+
 #ifdef WII
 
 /** Use same as file big endian. */
@@ -38,13 +72,14 @@ int *__errno(void)
 
 static void rom_readfn(png_structp png_ptr, png_bytep buffer, png_size_t size)
 {
+	png_voidp io_ptr = png_get_io_ptr(png_ptr);
 	int ret;
 	png_size_t len;
 
 	len = 0;
 
 	while (len != size) {
-		ret = rom_read((rom_stream_t *) png_ptr->io_ptr, &buffer[len], size);
+		ret = rom_read((rom_stream_t *) io_ptr, &buffer[len], size);
 		if (ret < 0) {
 			png_error(png_ptr, "Error reading file.");
 		} else
@@ -132,29 +167,37 @@ uint32_t *loadPng(const char *filename, uint16_t *width, uint16_t *height, uint1
 
 	//printf("Width: %d Height: %d Depth: %d\n", info_ptr->width, info_ptr->height, info_ptr->pixel_depth / 8);
 
-	*width = info_ptr->width;
-	*height = info_ptr->height;
-	*depth = info_ptr->pixel_depth / 8;
+	*width = png_get_image_width(png_ptr, info_ptr);
+	*height = png_get_image_height(png_ptr, info_ptr);
+	*depth = png_get_bit_depth(png_ptr, info_ptr) / 8;
 
 	/* close the file */
 	rom_close(fp);
 
-	dest = (color_type_t *) memalign(32, info_ptr->width * info_ptr->height * sizeof(color_type_t));
+	dest = (color_type_t *) memalign(32,
+		png_get_image_width(png_ptr, info_ptr) *
+		png_get_image_height(png_ptr, info_ptr) *
+		sizeof(color_type_t));
 
 	if (dest != NULL) {
-		memset(dest, 0, info_ptr->width * info_ptr->height * sizeof(color_type_t));
-		for (y = 0; y < info_ptr->height; y++) {
+
+		memset(dest, 0,
+			png_get_image_width(png_ptr, info_ptr) *
+			png_get_image_height(png_ptr, info_ptr) *
+			sizeof(color_type_t));
+		for (y = 0; y < png_get_image_height(png_ptr, info_ptr); y++) {
 			unsigned char *p;
 
-			p = info_ptr->row_pointers[y];
-			for (x = 0; x < info_ptr->width; x++) {
+			p = png_get_rows(png_ptr, info_ptr)[y];
+
+			for (x = 0; x < png_get_image_width(png_ptr, info_ptr); x++) {
 				rgb_color_t rgb;
 				rgb_color_t *c;
 				uint32_t off;
 
 				c = (rgb_color_t *) p;
 				rgb = *c;
-				if (info_ptr->color_type == PNG_COLOR_TYPE_RGBA) {
+				if (png_get_color_type(png_ptr, info_ptr) == PNG_COLOR_TYPE_RGBA) {
 #ifdef PS2
 					rgb.a = c->a >> 1;
 					if (rgb.a != 0)
@@ -168,9 +211,9 @@ uint32_t *loadPng(const char *filename, uint16_t *width, uint16_t *height, uint1
 					else
 						rgb.a = MAX_ALPHA;
 				}
-				off = getGraphicOffset(x, y, info_ptr->width);
+				off = getGraphicOffset(x, y, png_get_image_width(png_ptr, info_ptr));
 				dest[off] = getNativeColor(rgb);
-				if (info_ptr->color_type == PNG_COLOR_TYPE_RGBA)
+				if (png_get_color_type(png_ptr, info_ptr) == PNG_COLOR_TYPE_RGBA)
 					p += 4;
 				else
 					p += 3;
