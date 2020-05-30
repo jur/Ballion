@@ -1,14 +1,26 @@
 #include <stdint.h>
+#include <stdio.h>
+#ifndef USE_SDL2
 #include <SDL/SDL_rotozoom.h>
+#endif
 #ifdef USE_OPENGL
 #ifdef GLES1
 #include <EGL/egl.h>
 #include <GLES/gl.h>
+#ifdef USE_SDL2
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_syswm.h>
+#else
 #include <SDL/SDL.h>
 #include <SDL/SDL_syswm.h>
+#endif
 #else
 #include <GL/gl.h>
+#ifdef USE_SDL2
+#include <SDL2/SDL.h>
+#else
 #include <SDL/SDL.h>
+#endif
 #endif
 #endif
 
@@ -18,6 +30,8 @@
 #include "config.h"
 
 #ifdef USE_OPENGL
+#include <stdio.h>
+
 #define GL_CHECK() \
 	do { \
 		int glError; \
@@ -31,7 +45,9 @@
 
 extern SDL_Surface *screen;
 static int padState = 0;
+#ifndef USE_WASM
 int maxfps = 80;
+#endif
 
 uint16_t get_max_x(void)
 {
@@ -110,6 +126,7 @@ void check_sdl_events()
 					SDL_WM_ToggleFullScreen(screen);
 				}
 				break;
+#ifndef USE_WASM
 			case SDLK_RSHIFT:
 				if (maxfps > 0) {
 					maxfps--;
@@ -122,6 +139,13 @@ void check_sdl_events()
 					SDL_setFramerate(&manex, maxfps);
 				}
 				break;
+#endif
+			case SDLK_s:
+				if (event.type == SDL_KEYDOWN) {
+					toggle_sound();
+				}
+				break;
+
 			default:
 				newState = 0;
 				break;
@@ -136,7 +160,7 @@ void check_sdl_events()
 	}
 }
 
-void setpixel(SDL_Surface * screen, int x, int y, uint8_t r, uint8_t g,
+static void setpixel(SDL_Surface *dest, int x, int y, uint8_t r, uint8_t g,
 	uint8_t b)
 {
 	uint8_t *ubuff8;
@@ -145,33 +169,27 @@ void setpixel(SDL_Surface * screen, int x, int y, uint8_t r, uint8_t g,
 	uint32_t color;
 	char c1, c2, c3;
 
-	/* Lock the screen, if needed */
-	if (SDL_MUSTLOCK(screen)) {
-		if (SDL_LockSurface(screen) < 0)
-			return;
-	}
-
 	/* Get the color */
-	color = SDL_MapRGB(screen->format, r, g, b);
+	color = SDL_MapRGB(dest->format, r, g, b);
 
 	/* How we draw the pixel depends on the bitdepth */
-	switch (screen->format->BytesPerPixel) {
+	switch (dest->format->BytesPerPixel) {
 	case 1:
-		ubuff8 = (uint8_t *) screen->pixels;
-		ubuff8 += (y * screen->pitch) + x;
+		ubuff8 = (uint8_t *) dest->pixels;
+		ubuff8 += (y * dest->pitch) + x;
 		*ubuff8 = (uint8_t) color;
 		break;
 
 	case 2:
-		ubuff8 = (uint8_t *) screen->pixels;
-		ubuff8 += (y * screen->pitch) + (x * 2);
+		ubuff8 = (uint8_t *) dest->pixels;
+		ubuff8 += (y * dest->pitch) + (x * 2);
 		ubuff16 = (uint16_t *) ubuff8;
 		*ubuff16 = (uint16_t) color;
 		break;
 
 	case 3:
-		ubuff8 = (uint8_t *) screen->pixels;
-		ubuff8 += (y * screen->pitch) + (x * 3);
+		ubuff8 = (uint8_t *) dest->pixels;
+		ubuff8 += (y * dest->pitch) + (x * 3);
 
 
 		if (SDL_BYTEORDER == SDL_LIL_ENDIAN) {
@@ -190,19 +208,14 @@ void setpixel(SDL_Surface * screen, int x, int y, uint8_t r, uint8_t g,
 		break;
 
 	case 4:
-		ubuff8 = (uint8_t *) screen->pixels;
-		ubuff8 += (y * screen->pitch) + (x * 4);
+		ubuff8 = (uint8_t *) dest->pixels;
+		ubuff8 += (y * dest->pitch) + (x * 4);
 		ubuff32 = (uint32_t *) ubuff8;
 		*ubuff32 = color;
 		break;
 
 	default:
 		fprintf(stderr, "Error: Unknown bitdepth!\n");
-	}
-
-	/* Unlock the screen if needed */
-	if (SDL_MUSTLOCK(screen)) {
-		SDL_UnlockSurface(screen);
 	}
 }
 
@@ -252,12 +265,18 @@ static void load_texture(tile_t * tile, int alpha)
 }
 #endif
 
-static void paint_image(SDL_Surface * dest, int16_t x, int16_t y, tile_t * tile,
+static void paint_image(SDL_Surface *dest, int16_t x, int16_t y, tile_t * tile,
 	int16_t w, int16_t h)
 {
 	int xi, yi;
 	int j;
 	int i;
+
+	/* Lock the dest, if needed */
+	if (SDL_MUSTLOCK(dest)) {
+		if (SDL_LockSurface(dest) < 0)
+			return;
+	}
 
 	i = 0;
 	j = 0;
@@ -276,6 +295,11 @@ static void paint_image(SDL_Surface * dest, int16_t x, int16_t y, tile_t * tile,
 			i++;
 		}
 		j += tile->w;
+	}
+
+	/* Unlock the dest if needed */
+	if (SDL_MUSTLOCK(dest)) {
+		SDL_UnlockSurface(dest);
 	}
 }
 
@@ -319,9 +343,15 @@ void put_image_textured(int16_t x, int16_t y, tile_t * tile, int32_t z,
 		tile->buf = surface;
 		load_texture(tile, alpha);
 #else
-		tile->buf =
-			(void *) zoomSurface(surface, FONT_ZOOM_FACTOR, FONT_ZOOM_FACTOR,
-			SMOOTHING_ON);
+		if (tile->w > 600) {
+			tile->buf = (void *) zoomSurface(surface,
+				0.8, 0.8,
+				SMOOTHING_ON);
+		} else {
+			tile->buf = (void *) zoomSurface(surface,
+				FONT_ZOOM_FACTOR, FONT_ZOOM_FACTOR,
+				SMOOTHING_ON);
+		}
 		SDL_FreeSurface(surface);
 #endif
 		surface = NULL;
@@ -371,7 +401,11 @@ void put_image_textured(int16_t x, int16_t y, tile_t * tile, int32_t z,
 	destination.w = w;
 	destination.h = h;
 	if ((tile->w == 16) && (w != 26)) {
+#ifdef USE_WASM
+		SDL_BlitScaled(sprite, NULL, screen, &destination);
+#else
 		SDL_SoftStretch(sprite, NULL, screen, &destination);
+#endif
 	} else {
 		SDL_BlitSurface(sprite, NULL, screen, &destination);
 	}

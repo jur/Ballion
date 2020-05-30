@@ -27,7 +27,7 @@ extern "C" {
 #endif
 #include "gamecontrol.h"
 
-void selectPlayer();
+void selectPlayer(int back);
 
 #ifdef __cplusplus
 }
@@ -43,6 +43,22 @@ extern int user;
 
 int screen_tile_width = 16;
 int screen_tile_height = 16;
+
+extern "C" {
+	void toggle_sound(void)
+	{
+		if (Board::soundOn)
+		{
+			stopAudio();
+			Board::soundOn = 0;
+		}
+		else
+		{
+			startAudio();
+			Board::soundOn = -1;
+		}
+	}
+}
 
 void Board::initialize()
 {
@@ -134,7 +150,9 @@ void Board::paint()
 		mainmenu->addItem("Load Game");
 		mainmenu->addItem("Save Game");
 #ifdef SDL_MODE
+#ifndef USE_WASM
 		mainmenu->addItem("Exit");
+#endif
 		mainmenu->setPosition(soff_x - 10, soff_y + 30);
 #else
 		mainmenu->setPosition(soff_x + 10, soff_y + 30);
@@ -627,20 +645,11 @@ void Board::mainMenuSelect()
 		break;
 
 	case 3:
-		if (soundOn)
-		{
-			stopAudio();
-			soundOn = 0;
-		}
-		else
-		{
-			startAudio();
-			soundOn = -1;
-		}
+		toggle_sound();
 		break;
 
 	case 4:
-		selectPlayer();
+		selectPlayer(1);
 		break;
 
 	case 5:
@@ -731,7 +740,9 @@ void Board::mainMenuSelect()
 
 #ifdef SDL_MODE
 	case 7:
+#ifndef USE_WASM
 		game_exit();
+#endif
 		break;
 #endif
 
@@ -941,7 +952,7 @@ void Board::checkCollisions()
 			x = ball_x;
 			xl = ball_x + 1;
 		}
-		else if (diff_x < 0)
+		else
 		{
 			// Move right
 			d = BALL_RIGHT;
@@ -1188,18 +1199,20 @@ Board::savegame_t *Board::loadGame()
 	
 #else
 	int mc_fd;
+	int rv;
 
 	mc_fd = fioOpen(SAVEDIR SAVEGAME,O_RDONLY);
 	if (mc_fd < 0)
 	{
-		printf("Failed to load game.\n");
+		printf("Failed to open game %s.\n", SAVEDIR SAVEGAME);
 		return NULL;
 	}
 	data = new savegame_t;
 	memset(data, 0, sizeof(savegame_t));
-	if (fioRead(mc_fd, data, sizeof(savegame_t)) != sizeof(data))
+	rv = fioRead(mc_fd, data, sizeof(savegame_t));
+	if (rv != sizeof(savegame_t))
 	{
-		printf("Failed to load game data.\n");
+		printf("Failed to load game data %s %d != %ld.\n", SAVEDIR SAVEGAME, rv, sizeof(savegame_t));
 	}
 	fioClose(mc_fd);
 #endif
@@ -1288,6 +1301,7 @@ void Board::saveGame(Board::savegame_t *data)
 #endif
 #endif
 #endif
+	sync_filesystem();
 }
 
 void Board::deleteAllMovingBlocks()

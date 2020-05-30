@@ -28,6 +28,10 @@ extern int screen_tile_height;
 
 class Board
 {
+	public:
+	/** True, if sound is activated. */
+	static int soundOn;
+
 	private:
 	/** The current level. */
 	Level *level;
@@ -65,8 +69,6 @@ class Board
 	int selectedMenu;
 	/** Destroyed blocks. */
 	int destroyedBlocks;
-	/** True, if sound is activated. */
-	static int soundOn;
 	/** Cheat for level jump. */
 	int cheatActivated;
 	/** Number of shown menu. */

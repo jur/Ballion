@@ -1,4 +1,7 @@
 #include <stdio.h>
+#ifdef USE_WASM
+#include <emscripten.h>
+#endif
 
 #include "board.h"
 #include "level.h"
@@ -24,173 +27,196 @@ Board boardb;
 Font *redfont = NULL;
 tile_t *banner = NULL;
 
-int user_select();
+Menu *playermenu;
+int showSelectPlayer;
 
-void selectPlayer()
-{
-	user = user_select();
-	if (user > 1)
-	{
-		boarda.setScreenOffset(0, OFFSET_Y);
-		boardb.setScreenOffset(2 * OFFSET_X, OFFSET_Y);
-	}
-	else
-	{
-		boarda.setScreenOffset(OFFSET_X, OFFSET_Y);
-	}
-}
-
-//---------------------------------------------------------------------------
-int user_select()
+void selectPlayer(int back)
 {
 	Font *font;
 	Font *smallfont;
 
 	font = Board::getFont();
 	smallfont = Board::getSmallFont();
-	Menu menu(font, smallfont);
-
-	menu.setPad(0);
-
-#ifdef SDL_MODE
-	menu.addItem("Back");
-#else
-	menu.addItem("1 Player");
-#endif
-#ifdef PS2
-	menu.addItem("2 Player");
-#endif
-	menu.addItem("Show Credits");
-#ifndef SDL_MODE
-	menu.addItem("Exit");
-#endif
 
 	if ((font != NULL)
 		&& (smallfont != NULL)
 		&& (redfont != NULL))
 	{
-		int ret;
-		int paddata;
-		int new_pad;
 		int old_pad;
-		int showCredits = 0;
-		int selectedMenu;
 
-		old_pad = readPad(0);
-		menu.setOldPadData(old_pad);
-		menu.setPosition(OFFSET_X, 60);
+		if (playermenu != NULL) {
+			delete playermenu;
+		}
+		playermenu = new Menu(font, smallfont);
 
-		ret = -1;
-		while ((ret < 0)
 #ifdef SDL_MODE
-			&& (exitkey == 0)
+		if (back) {
+			playermenu->addItem("Back");
+		} else {
+			playermenu->addItem("Start Game");
+		}
+#else
+		playermenu->addItem("1 Player");
 #endif
-				)
-		{
-			redfont->print(OFFSET_X, 10, "Ballion 2.1");
-
-			if (showCredits)
-			{
-				int y;
-				y = 60;
-				font->print(OFFSET_X, y, "Developer");
-				y += 9 + MENU_FONT_HEIGHT;
-				smallfont->print(OFFSET_X, y, "Juergen Urban");
-				y += MENU_FONT_HEIGHT;
-				font->print(OFFSET_X, y, "Free Music");
-				y += 9 + MENU_FONT_HEIGHT;
-				smallfont->print(OFFSET_X, y, "dma-sc - the first blip blop noel");
-				y += MENU_FONT_HEIGHT;
-				smallfont->print(OFFSET_X, y, "The 8bitpeoples: The 8bits of Christmas");
-				y += MENU_FONT_HEIGHT;
-				smallfont->print(OFFSET_X, y, "Creative Commons License:");
-				y += MENU_FONT_HEIGHT;
-				smallfont->print(OFFSET_X, y, "NonCommercial-NoDerivatives");
-			}
-			else
-			{
-				menu.paint();
-				if (banner != NULL) {
-					put_image_textured(85, 200, banner, 4,
-						BANNER_WIDTH,
-						BANNER_HEIGHT, 0);
-				}
-
-			}
-
-			// Show reslut.
-			flip_buffers();
-
-			if (!showCredits)
-			{
-				selectedMenu = menu.getSelection();
-				switch(selectedMenu)
-				{
-				case 0:
-					ret = 1;
-					break;
-
-				case 1:
 #ifdef PS2
-					ret = 2;
-					break;
-
-				case 2:
+		playermenu->addItem("2 Player");
 #endif
-					old_pad = menu.getOldPadData();
-					showCredits = -1;
-					break;
+		playermenu->addItem("Show Credits");
+#ifndef SDL_MODE
+		playermenu->addItem("Exit");
+#endif
+		playermenu->setPad(0);
+		old_pad = readPad(0);
+		playermenu->setOldPadData(old_pad);
+		playermenu->setPosition(OFFSET_X, 60);
+
+		showSelectPlayer = 1;
+	}
+}
+
+//---------------------------------------------------------------------------
+
+void select_player_loop(void)
+{
+	int ret;
+	int paddata;
+	int old_pad;
+	int new_pad;
+	static int showCredits = 0;
+	int selectedMenu;
+	Font *font;
+	Font *smallfont;
+
+	font = playermenu->getFont();
+	smallfont = playermenu->getSmallFont();
+
+	old_pad = playermenu->getOldPadData();
+
+	redfont->print(OFFSET_X, 10, "Ballion 2.1");
+
+	ret = -1;
+
+	if (!showCredits)
+	{
+		selectedMenu = playermenu->getSelection();
+		switch(selectedMenu)
+		{
+			case 0:
+				ret = 1;
+				break;
+
+			case 1:
+#ifdef PS2
+				ret = 2;
+				break;
+
+			case 2:
+#endif
+				old_pad = playermenu->getOldPadData();
+				showCredits = -1;
+				break;
 
 #ifndef PS2
-				case 2:
+			case 2:
 #else
-				case 3:
+			case 3:
 #endif
-					game_exit();
-					break;
-
-				default:
-					break;
-				}
-			}
-			else
-			{
-				paddata = readPad(0);
-				new_pad = paddata & ~old_pad;
-				old_pad = paddata;
-
-				if (new_pad & PAD_CROSS) {
-					showCredits = 0;
-					menu.setOldPadData(old_pad);
-				}
-				if (new_pad & PAD_TRIANGLE) {
-					showCredits = 0;
-					menu.setOldPadData(old_pad);
-				}
-				if (new_pad & PAD_START) {
-					showCredits = 0;
-					menu.setOldPadData(old_pad);
-				}
-			}
-#ifndef PSP
-			// Update audio buffers.
-			playAudio();
+#ifndef USE_WASM
+				game_exit();
 #endif
+				break;
+
+			default:
+				break;
 		}
-		return ret;
 	}
 	else
-		return 2;
+{
+		paddata = readPad(0);
+		new_pad = paddata & ~old_pad;
+		old_pad = paddata;
+
+		if (new_pad & PAD_CROSS) {
+			showCredits = 0;
+			playermenu->setOldPadData(old_pad);
+		}
+		if (new_pad & PAD_TRIANGLE) {
+			showCredits = 0;
+			playermenu->setOldPadData(old_pad);
+		}
+		if (new_pad & PAD_START) {
+			showCredits = 0;
+			playermenu->setOldPadData(old_pad);
+		}
+	}
+
+	drawBackground();
+
+	if (showCredits)
+	{
+		int y;
+		y = 60;
+		font->print(OFFSET_X, y, "Developer");
+		y += 9 + MENU_FONT_HEIGHT;
+		smallfont->print(OFFSET_X, y, "Juergen Urban");
+		y += MENU_FONT_HEIGHT;
+		font->print(OFFSET_X, y, "Free Music");
+		y += 9 + MENU_FONT_HEIGHT;
+		smallfont->print(OFFSET_X, y, "dma-sc - the first blip blop noel");
+		y += MENU_FONT_HEIGHT;
+		smallfont->print(OFFSET_X, y, "The 8bitpeoples: The 8bits of Christmas");
+		y += MENU_FONT_HEIGHT;
+		smallfont->print(OFFSET_X, y, "Creative Commons License:");
+		y += MENU_FONT_HEIGHT;
+		smallfont->print(OFFSET_X, y, "NonCommercial-NoDerivatives");
+	}
+	else
+	{
+		playermenu->paint();
+		if (banner != NULL) {
+			put_image_textured(85, 200, banner, 4,
+				BANNER_WIDTH,
+				BANNER_HEIGHT, 0);
+		}
+	}
+
+#ifndef PSP
+	// Update audio buffers.
+	playAudio();
+#endif
+
+	// Show result.
+	flip_buffers();
+
+	if ((ret >= 0)
+#ifdef SDL_MODE
+		|| (exitkey != 0)
+#endif
+	) {
+		showSelectPlayer = 0;
+		if (ret > 1)
+		{
+			boarda.setScreenOffset(0, OFFSET_Y);
+			boardb.setScreenOffset(2 * OFFSET_X, OFFSET_Y);
+		}
+		else
+		{
+			boarda.setScreenOffset(OFFSET_X, OFFSET_Y);
+		}
+		game_player_ready();
+	}
 }
 
 //---------------------------------------------------------------------------
 void game_loop(void)
 {
+#if 0
 	int maxx;
 	int maxy;
 
 	maxx = get_max_x();
 	maxy = get_max_y();
+#endif
 
 	boarda.checkCollisions();
 
@@ -198,7 +224,10 @@ void game_loop(void)
 		boardb.checkCollisions();
 
 	// Background
-	//g2_put_image_textured(0, 0, maxx, maxy, blocks[0].b, 3, blocks[0].w, blocks[0].h);
+#if 0
+	g2_put_image_textured(0, 0, maxx, maxy, blocks[0].b, 3, blocks[0].w, blocks[0].h);
+#endif
+	drawBackground();
 
 	// Blocks
 	boarda.paint();
@@ -219,10 +248,37 @@ void game_loop(void)
 		boardb.checkLevelFinish();
 }
 
+#ifdef USE_WASM
+void main_loop(void *)
+#else
+void main_loop(void)
+#endif
+{
+	if (showSelectPlayer) {
+		select_player_loop();
+	} else {
+		game_loop();
+	}
+}
+
 //---------------------------------------------------------------------------
 int main(int argc, char **argv)
 {
 	int startlevel = 0;
+
+#ifdef USE_WASM
+	printf("Please use keyboard to control the game.\n");
+	printf("Press RETURN to select menu entry\n");
+	printf("Press SPACE open menu\n");
+	printf("Press s to enable/disable music\n");
+	printf("\n");
+	printf("Cursor keys:\n");
+	printf("UP/DOWN select menu entry\n");
+	printf("LEFT/RIGHT move ball\n");
+	printf("Savegame can be stored in menu and is saved in IndexedDB\n");
+	printf("All data stays on the machine which runs the web browser\n");
+	printf("The game does not use the internet connection after the game is loaded\n");
+#endif
 
 #ifdef SDL_MODE
 	if (argc > 1) {
@@ -254,13 +310,6 @@ int main(int argc, char **argv)
 	redfont = new Font("resources/beastwars.png", 64, 48, red, 0);
 	banner = load_tiles("resources/banner.png", 1, BANNER_WIDTH, BANNER_HEIGHT, 0, 0);
 
-#if 0
-	/* XXX: graphic test loop */
-	while(1) {
-		boarda.paintBlock(0, 0, 2);
-		flip_buffers();
-	}
-#endif
 #ifdef PSP
 	/* Flush all graphics out. */
 	sceKernelDcacheWritebackAll();
@@ -268,17 +317,20 @@ int main(int argc, char **argv)
 
 #ifdef SDL_MODE
 	boarda.setScreenOffset(OFFSET_X, OFFSET_Y);
-#else
-	selectPlayer();
 #endif
+	selectPlayer(0);
 
+#ifdef USE_WASM
+	emscripten_set_main_loop_arg(main_loop, NULL, -1, 1);
+#else
 #ifndef SDL_MODE
 	while(1) {
 #else
 	while(!exitkey) {
 #endif
-		game_loop();
+		main_loop();
 	}
+#endif
 
 	game_exit();
 

@@ -49,6 +49,14 @@ class Menu
 	void setPrivate(void *p);
 	void *getPrivate();
 	void setPad(int nr);
+	Font *getFont(void)
+	{
+		return font;
+	}
+	Font *getSmallFont(void)
+	{
+		return smallfont;
+	}
 };
 
 #endif

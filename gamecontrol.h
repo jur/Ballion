@@ -13,7 +13,11 @@ extern int sound_thid;
 
 void game_setup(void);
 void game_exit(void);
+void drawBackground(void);
 void flip_buffers(void);
+void game_player_ready(void);
+void toggle_sound(void);
+void sync_filesystem(void);
 
 #ifdef __cplusplus
 }

@@ -1,0 +1,28 @@
+# How to build for webassembly:
+
+git clone https://github.com/emscripten-core/emsdk.git
+cd emsdk
+./emsdk install latest
+./emsdk activate latest
+
+source ./emsdk_env.sh --build=Release
+cd ..
+
+# Download libmad:
+https://sourceforge.net/projects/mad/
+
+tar -xzf libmad-0.15.1b.tar.gz
+cd libmad-0.15.1b
+ac_cv_c_compiler_gnu=no emconfigure ./configure
+emmake make
+
+# An error happens when linking, remove soname and retry to link:
+emcc -shared  .libs/version.o .libs/fixed.o .libs/bit.o .libs/timer.o .libs/stream.o .libs/frame.o .libs/synth.o .libs/decoder.o .libs/layer12.o .libs/layer3.o .libs/huffman.o  -lc  -soname libmad.so.0 -o .libs/libmad.so.0.2.1
+
+emcc -O3 .libs/libmad.so.0.2.1 -o libmad.js
+
+cd ../Ballion
+make
+make run
+
+# Open printed URL in web browser and select ballion.html: http://0.0.0.0:8080/ballion.html

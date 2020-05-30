@@ -1,6 +1,7 @@
 #include <png.h>
 #ifndef PS2
 #include <malloc.h>
+#include <string.h>
 #endif
 #include "pngloader.h"
 #include "rom.h"

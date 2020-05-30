@@ -17,6 +17,10 @@
 #include "mp3loader.h"
 #include "graphic.h"
 
+#if defined(PS2) || defined(WII) || defined(PSP) || defined(USE_WASM)
+#define NO_SDL_MIXER 1
+#endif
+
 
 #ifdef PSP
 #define AUDIO_BUFFER_SIZE 4096
@@ -31,6 +35,7 @@
 #define MAX_STRING 256
 
 static int soundOn = -1;
+static int soundInitialized = 0;
 
 typedef struct sound
 {
@@ -52,98 +57,102 @@ typedef struct play
 	struct play *next;
 } play_t;
 
+#ifndef USE_WASM
 sound_t background_music1 =
 {
-	filename: "sound/music.mp3",
-	loadData: 0,
-	volume: 2
+	.filename = "sound/music.mp3",
+	.loadData = 0,
+	.volume = 2
 };
+#endif
 
 sound_t background_music2 =
 {
 #ifdef PSP
-	filename: "ms0:/PSP/GAME/Ballion/blipblop.mp3",
-	loadData: 1,
+	.filename = "ms0:/PSP/GAME/Ballion/blipblop.mp3",
+	.loadData = 1,
 #else
-	filename: "sound/blipblop.mp3",
-	loadData: 0,
+	.filename = "sound/blipblop.mp3",
+	.loadData = 0,
 #endif
-	volume: 1
+	.volume = 1
 };
 
 sound_t *background_musics[] =
 {
+#ifndef USE_WASM
 	&background_music1,
+#endif
 	&background_music2,
 	NULL
 };
 
 sound_t zip_effect =
 {
-	filename: "sound/zip.mp3",
-	loadData: 1,
-	volume: 2
+	.filename = "sound/zip.mp3",
+	.loadData = 1,
+	.volume = 2
 };
 
 sound_t explosion_effect =
 {
-	filename: "sound/explosion.mp3",
-	loadData: 1,
-#ifdef SDL_MODE
-	volume: 5
+	.filename = "sound/explosion.mp3",
+	.loadData = 1,
+#ifndef NO_SDL_MIXER
+	.volume = 5
 #else
-	volume: 2
+	.volume = 2
 #endif
 };
 
 sound_t balldrop_effect =
 {
-	filename: "sound/balldrop.mp3",
-	loadData: 1,
-#ifdef SDL_MODE
-	volume: 40
+	.filename = "sound/balldrop.mp3",
+	.loadData = 1,
+#ifndef NO_SDL_MIXER
+	.volume = 40
 #else
-	volume: 6
+	.volume = 6
 #endif
 };
 
 sound_t applause_effect =
 {
-	filename: "sound/applause.mp3",
-	loadData: 1,
-#ifdef SDL_MODE
-	volume: 7
+	.filename = "sound/applause.mp3",
+	.loadData = 1,
+#ifndef NO_SDL_MIXER
+	.volume = 7
 #else
-	volume: 2
+	.volume = 2
 #endif
 };
 
 sound_t colorchange_effect =
 {
-	filename: "sound/beep11.mp3",
-	loadData: 1,
-#ifdef SDL_MODE
-	volume: 1
+	.filename = "sound/beep11.mp3",
+	.loadData = 1,
+#ifndef NO_SDL_MIXER
+	.volume = 1
 #else
-	volume: 3
+	.volume = 3
 #endif
 };
 
 sound_t blockmove_effect =
 {
-	filename: "sound/boing1.mp3",
-	loadData: 1,
-	volume: 3
+	.filename = "sound/boing1.mp3",
+	.loadData = 1,
+	.volume = 3
 };
 
 sound_t blockdestroy_effect =
 {
-	filename: "sound/sonarbeep.mp3",
-	loadData: 1,
-#ifdef SDL_MODE
-	volume: 1
+	.filename = "sound/sonarbeep.mp3",
+	.loadData = 1,
+#ifndef NO_SDL_MIXER
+	.volume = 1
 #else
-	volume: 6
+	.volume = 6
 #endif
 };
 
@@ -223,6 +232,10 @@ static void playEffect(sound_t *effect)
 {
 	play_t *current;
 
+	if (soundInitialized == 0) {
+		return;
+	}
+
 	current = malloc(sizeof(play_t));
 	if (current != NULL)
 	{
@@ -285,7 +298,7 @@ void playBlockdestroy()
 	playEffect(&blockdestroy_effect);
 }
 
-void loadSound(sound_t *effect)
+static void loadSound(sound_t *effect)
 {
 	const char *extension;
 
@@ -450,6 +463,13 @@ void audioCallback(void *buf, unsigned int length, void *userdata) {
 void initializeAudio()
 {
 	int i;
+
+	if (soundInitialized != 0) {
+		return;
+	}
+
+	soundInitialized = 1;
+
 #ifdef PS2
 	int ret;
 	static struct audsrv_fmt_t format;
@@ -634,7 +654,7 @@ static void resetData(play_t *current)
 	{
 		if (!current->effect->loadData)
 		{
-			printf("reopen %s\n", current->effect->filename);
+			// printf("reopen %s\n", current->effect->filename);
 			// File is not in memory any more, just reopen file:
 			mp3_close(current->effect->fd);
 			current->effect->fd = mp3_open(current->effect->filename);
@@ -659,7 +679,7 @@ static int getNextSound(play_t *current, unsigned char *buffer, int size)
 {
 	unsigned char loadbuffer[size];
 	int ret;
-#if defined(PS2) || defined(WII) || defined(PSP)
+#ifdef NO_SDL_MIXER
 	int i;
 #endif
 
@@ -681,14 +701,17 @@ static int getNextSound(play_t *current, unsigned char *buffer, int size)
 		}
 		else
 		{
-#if defined(PS2) || defined(WII) || defined(PSP)
+#ifdef NO_SDL_MIXER
 			for (i = 0; i < ret/2; i++)
 			{
 				((short *)buffer)[i] = ((short *)buffer)[i] + ((short *)loadbuffer)[i] / current->effect->volume;
 			}
-#endif
-#ifdef SDL_MODE
+#else
+#if 0
+			SDL_MixAudioFormat(buffer, loadbuffer, AUDIO_S16, ret, 48 + 16 * current->effect->volume);
+#else
 			SDL_MixAudio(buffer, loadbuffer, ret, 48 + 16 * current->effect->volume);
+#endif
 #endif
 			return 0;
 		}
@@ -777,6 +800,9 @@ static void getNextAudioData(unsigned char *buffer, int size)
 
 void playAudio()
 {
+	if (soundInitialized == 0) {
+		return;
+	}
 #ifdef PS2
 	static unsigned char buffer[AUDIO_BUFFER_SIZE];
 

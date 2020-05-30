@@ -20,6 +20,18 @@ void flip_buffers(void)
 	gamecubeVsync();
 }
 
+void drawBackground(void)
+{
+}
+
+void game_player_ready(void)
+{
+}
+
+void sync_filesystem(void)
+{
+}
+
 void game_setup(void)
 {
 	gamecubeInitGraphic();

@@ -43,6 +43,18 @@ void flip_buffers(void)
 	g2_enable_zbuffer();
 }
 
+void drawBackground(void)
+{
+}
+
+void game_player_ready(void)
+{
+}
+
+void sync_filesystem(void)
+{
+}
+
 void game_setup(void)
 {
 	uint16_t maxx, maxy;

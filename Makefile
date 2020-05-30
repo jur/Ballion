@@ -7,7 +7,11 @@ else
 ifneq ($(PSPDEV),)
 TYPE = psp
 else
+ifneq ($(EMSDK),)
+TYPE = wasm
+else
 TYPE = sdl
+endif
 endif
 endif
 endif
