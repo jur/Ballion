@@ -64,8 +64,6 @@ static EGLSurface g_eglSurface = 0;
 static Display *g_x11Display = NULL;
 #endif
  
-static GLuint texture; // TBD: Texture object handle
- 
 #ifdef GLES1
 static const EGLint g_configAttribs[] ={
 										  EGL_RED_SIZE,      	    COLOURDEPTH_RED_SIZE,
