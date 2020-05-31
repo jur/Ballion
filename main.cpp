@@ -275,6 +275,7 @@ int main(int argc, char **argv)
 	printf("Cursor keys:\n");
 	printf("UP/DOWN select menu entry\n");
 	printf("LEFT/RIGHT move ball\n");
+	printf("Tap on left or right side to move ball\n");
 	printf("Savegame can be stored in menu and is saved in IndexedDB\n");
 	printf("All data stays on the machine which runs the web browser\n");
 	printf("The game does not use the internet connection after the game is loaded\n");

@@ -11,4 +11,6 @@
 #define FONT_ZOOM_FACTOR 1.625
 #define MENU_FONT_HEIGHT 48
 
+extern int sdl_ready;
+
 #endif /* __CONFIG_H__ */

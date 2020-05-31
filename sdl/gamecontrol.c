@@ -71,6 +71,7 @@ FPSmanager manex;
 #endif
 
 int exitkey = 0;
+int sdl_ready = 0;
 
 #ifdef USE_OPENGL
 #ifdef GLES1
@@ -349,6 +350,7 @@ void game_setup(void)
 
 void game_player_ready(void)
 {
+	sdl_ready = 1;
 	initializeAudio();
 }
 

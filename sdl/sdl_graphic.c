@@ -75,6 +75,10 @@ void check_sdl_events()
 {
 	SDL_Event event;
 	int newState = 0;
+	static int wheelState = 0;
+
+	padState = padState & ~wheelState;
+	wheelState = 0;
 
 	// This normally should handle audio, but we need to handle key events.
 	while (SDL_PollEvent(&event)) {
@@ -83,6 +87,52 @@ void check_sdl_events()
 			exitkey = 1;
 			printf("Got quit event!\n");
 			break;
+
+		case SDL_MOUSEBUTTONDOWN:
+		case SDL_MOUSEBUTTONUP:
+			switch (event.button.button)
+			{
+				case SDL_BUTTON_LEFT:
+					if (!sdl_ready) {
+						newState = PAD_CROSS;
+					} else {
+						int mid;
+
+						mid = get_max_x() / 2;
+						if (event.button.x < mid) {
+							newState = PAD_LEFT;
+						} else {
+							newState = PAD_RIGHT;
+						}
+					}
+					break;
+
+				case SDL_BUTTON_RIGHT:
+					newState = PAD_START;
+					break;
+			}
+			if (event.type == SDL_MOUSEBUTTONDOWN) {
+				padState = padState | newState;
+			} else {
+				padState = padState & ~newState;
+			}
+			break;
+#ifdef SDL_MOUSEWHEEL
+		case SDL_MOUSEWHEEL:
+			if (event.wheel.y > 0) {
+				wheelState = PAD_UP;
+			} else if (event.wheel.y < 0) {
+				wheelState = PAD_DOWN;
+			}
+			if (event.wheel.x > 0) {
+				wheelState = PAD_RIGHT;
+			} else if(event.wheel.x < 0) {
+				wheelState = PAD_LEFT;
+			}
+			padState = padState | wheelState;
+			break;
+#endif
+
 		case SDL_KEYDOWN:
 		case SDL_KEYUP:
 #if 0

@@ -5,6 +5,9 @@ LIBMADPATH = ../libmad-0.15.1b
 
 LDFLAGS += $(LIBMADPATH)/.libs/libmad.so.0.2.1
 LDFLAGS += -lidbfs.js
+LDFLAGS	+= --preload-file resources
+#LDFLAGS	+= --preload-file sound
+LDFLAGS	+= --preload-file levels
 
 CXXFLAGS += -std=c++11
 CPPFLAGS += -s WASM=1
@@ -14,19 +17,20 @@ CPPFLAGS += -s LLD_REPORT_UNDEFINED
 CPPFLAGS += -O3
 CPPFLAGS += -DUSE_WASM=1
 CPPFLAGS += -s ASSERTIONS=1
-CPPFLAGS += -s INITIAL_MEMORY=33554432
+#CPPFLAGS += -s INITIAL_MEMORY=33554432
+CPPFLAGS += -s ALLOW_MEMORY_GROWTH=1
 #CPPFLAGS += -DUSE_SDL2=1
 
 USE_OPENGL	= no
 ROM_FILES	= sound/applause.mp3 sound/balldrop.mp3 sound/beep11.mp3
 ROM_FILES	+= sound/boing1.mp3 sound/zip.mp3 sound/sonarbeep.mp3
 ROM_FILES	+= sound/explosion.mp3
-ROM_FILES	+= resources/blocks.png resources/balls.png resources/zip.png
-ROM_FILES	+= resources/helmet.png resources/explosion.png
-ROM_FILES	+= resources/beastwars.png
-ROM_FILES	+= resources/banner.png
+#ROM_FILES	+= resources/blocks.png resources/balls.png resources/zip.png
+#ROM_FILES	+= resources/helmet.png resources/explosion.png
+#ROM_FILES	+= resources/beastwars.png
+#ROM_FILES	+= resources/banner.png
 ROM_FILES	+= sound/blipblop.mp3
-ROM_FILES	+= $(filter-out levels/CVS,$(wildcard levels/*))
+#ROM_FILES	+= $(filter-out levels/CVS,$(wildcard levels/*))
 
 BIN		= ballion$(EXTENSION)
 
@@ -41,7 +45,9 @@ MODS		+= pngloader rom font menu sdl/gamecontrol
 MODS		+= sdl/utils
 OBJS		= $(addprefix $(OBJDIR)/, $(addsuffix .o, $(MODS)))
 ifeq ($(DEBUG),yes)
-CPPFLAGS	+= -DDEBUG
+CPPFLAGS	+= -DDEBUG -g4 --source-map-base http://localhost:8080/ -s MAIN_MODULE=1
+# For debugging in opera or edge, uses asm.js (javascript) instead of WebAssembly
+#CPPFLAGS	+= -s WASM=0
 endif
 CPPFLAGS	+= -g -O2 -DSDL_MODE
 CPPFLAGS	+= -I. -Isdl -W -Wall
@@ -84,6 +90,9 @@ AS = $(CC) -xassembler-with-cpp -c -Wall
 
 $(PROGRAM).html: $(OBJS)
 	$(CXX) $(CPPFLAGS) $(CFLAGS) $(CXXFLAGS) $(LDFLAGS) -o $@ $(OBJS)
+#ifeq ($(DEBUG),yes)
+#	echo "//# sourceMappingURL=http://localhost:8080/debug.wasm.map" >>$(PROGRAM).js
+#endif
 
 $(OBJDIR)/%.o: %.c
 	@mkdir -p $(dir $@)
