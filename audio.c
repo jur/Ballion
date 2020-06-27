@@ -13,11 +13,20 @@
 #endif
 
 #include "audio.h"
+#ifndef SDL_MIX
 #include "waveformat.h"
 #include "mp3loader.h"
+#endif
 #include "graphic.h"
 
-#if defined(PS2) || defined(WII) || defined(PSP) || defined(USE_WASM)
+#ifdef SDL_MIX
+#include <SDL_mixer.h>
+#endif
+
+#if defined(PS2) || defined(WII) || defined(PSP)
+#define NO_SDL_MIXER 1
+#endif
+#if !defined(USE_SDL2) && defined(USE_WASM)
 #define NO_SDL_MIXER 1
 #endif
 
@@ -40,13 +49,19 @@ static int soundInitialized = 0;
 typedef struct sound
 {
 	char filename[MAX_STRING];
+#ifdef SDL_MIX
+	int isBgm;
+	Mix_Music *music;
+	Mix_Chunk *chunk;
+#else
 	rom_stream_t *fin;
 	mp3_stream_t *fd;
 	int startoffset;
 	int filesize;
 	wave_format_ex_t format;
-	int loadData;
 	unsigned char *data;
+#endif
+	int loadData;
 	int volume;
 } sound_t;
 
@@ -57,11 +72,20 @@ typedef struct play
 	struct play *next;
 } play_t;
 
+#ifdef USE_WASM
+#define EXTENSION ".ogg"
+#else
+#define EXTENSION ".mp3"
+#endif
+
 #ifndef USE_WASM
 sound_t background_music1 =
 {
-	.filename = "sound/music.mp3",
+	.filename = "sound/music" EXTENSION,
 	.loadData = 0,
+#ifdef SDL_MIX
+	.isBgm = 1,
+#endif
 	.volume = 2
 };
 #endif
@@ -69,11 +93,14 @@ sound_t background_music1 =
 sound_t background_music2 =
 {
 #ifdef PSP
-	.filename = "ms0:/PSP/GAME/Ballion/blipblop.mp3",
+	.filename = "ms0:/PSP/GAME/Ballion/blipblop" EXTENSION,
 	.loadData = 1,
 #else
-	.filename = "sound/blipblop.mp3",
+	.filename = "sound/blipblop" EXTENSION,
 	.loadData = 0,
+#endif
+#ifdef SDL_MIX
+	.isBgm = 1,
 #endif
 	.volume = 1
 };
@@ -89,14 +116,14 @@ sound_t *background_musics[] =
 
 sound_t zip_effect =
 {
-	.filename = "sound/zip.mp3",
+	.filename = "sound/zip" EXTENSION,
 	.loadData = 1,
 	.volume = 2
 };
 
 sound_t explosion_effect =
 {
-	.filename = "sound/explosion.mp3",
+	.filename = "sound/explosion" EXTENSION,
 	.loadData = 1,
 #ifndef NO_SDL_MIXER
 	.volume = 5
@@ -107,7 +134,7 @@ sound_t explosion_effect =
 
 sound_t balldrop_effect =
 {
-	.filename = "sound/balldrop.mp3",
+	.filename = "sound/balldrop" EXTENSION,
 	.loadData = 1,
 #ifndef NO_SDL_MIXER
 	.volume = 40
@@ -118,7 +145,7 @@ sound_t balldrop_effect =
 
 sound_t applause_effect =
 {
-	.filename = "sound/applause.mp3",
+	.filename = "sound/applause" EXTENSION,
 	.loadData = 1,
 #ifndef NO_SDL_MIXER
 	.volume = 7
@@ -129,7 +156,7 @@ sound_t applause_effect =
 
 sound_t colorchange_effect =
 {
-	.filename = "sound/beep11.mp3",
+	.filename = "sound/beep11" EXTENSION,
 	.loadData = 1,
 #ifndef NO_SDL_MIXER
 	.volume = 1
@@ -140,14 +167,14 @@ sound_t colorchange_effect =
 
 sound_t blockmove_effect =
 {
-	.filename = "sound/boing1.mp3",
+	.filename = "sound/boing1" EXTENSION,
 	.loadData = 1,
 	.volume = 3
 };
 
 sound_t blockdestroy_effect =
 {
-	.filename = "sound/sonarbeep.mp3",
+	.filename = "sound/sonarbeep" EXTENSION,
 	.loadData = 1,
 #ifndef NO_SDL_MIXER
 	.volume = 1
@@ -191,7 +218,9 @@ int readAudioBuffer = 2;
 static int srcPos = AUDIO_BUFFER_SIZE;
 #endif
 
+#ifndef SDL_MIX
 static void getNextAudioData(unsigned char *buffer, int size);
+#endif
 
 #if 0
 struct audio_dither
@@ -230,12 +259,21 @@ inline short audio_linear_fix(int sample,
 
 static void playEffect(sound_t *effect)
 {
+#ifndef SDL_MIX
 	play_t *current;
+#endif
 
 	if (soundInitialized == 0) {
 		return;
 	}
 
+#ifdef SDL_MIX
+	if (effect != NULL) {
+		if (effect->chunk != NULL) {
+			Mix_PlayChannel(0, effect->chunk, 0);
+		}
+	}
+#else
 	current = malloc(sizeof(play_t));
 	if (current != NULL)
 	{
@@ -260,7 +298,7 @@ static void playEffect(sound_t *effect)
 	{
 		printf("Error: Out of memory, cannot play effects.\n");
 	}
-
+#endif
 }
 
 void playZip()
@@ -298,15 +336,29 @@ void playBlockdestroy()
 	playEffect(&blockdestroy_effect);
 }
 
-static void loadSound(sound_t *effect)
+static int loadSound(sound_t *effect)
 {
+#ifdef SDL_MIX
+	if (effect->isBgm) {
+		effect->music = Mix_LoadMUS(effect->filename);
+		if (effect->music == NULL) {
+			return -1;
+		}
+	} else {
+		effect->chunk = Mix_LoadWAV(effect->filename);
+		if (effect->chunk == NULL) {
+			return -1;
+		}
+	}
+	return 0;
+#else
 	const char *extension;
 
 	extension = strrchr(effect->filename, '.');
 	if (extension == NULL)
 	{
 		printf("Error: File \"%s\" cannot be loaded, extension missing.\n", effect->filename);
-		return;
+		return -1;
 	}
 	extension++;
 
@@ -397,12 +449,18 @@ static void loadSound(sound_t *effect)
 	{
 		printf("Error: File \"%s\" cannot be loaded, extension \"%s\" is not supported.\n",
 				effect->filename, extension);
-		return;
+		return -1;
 	}
 
+	if ((effect->fin != NULL) || (effect->fd != NULL)) {
+		return 0;
+	} else {
+		return -1;
+	}
+#endif
 }
 
-#ifdef SDL_MODE
+#ifdef SDL_AUDIO
 void audioCallback(void *nichtVerwendet, Uint8 *stream, int laenge)
 {
 	(void) nichtVerwendet;
@@ -493,7 +551,7 @@ void initializeAudio()
 		return;
 	}
 #endif
-#ifdef SDL_MODE
+#ifdef SDL_AUDIO
 	SDL_AudioSpec format;
 
 	/* Setup audio */
@@ -510,12 +568,25 @@ void initializeAudio()
 	}
 
 #endif
+#ifdef SDL_MIX
+	if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+		printf("Could not initialize Audio via SDL MIX: %s\n", SDL_GetError());
+		return;
+	}
+#ifdef USE_WASM
+	Mix_VolumeMusic(MIX_MAX_VOLUME/4);
+#else
+	Mix_VolumeMusic(MIX_MAX_VOLUME/8);
+#endif
+	Mix_Volume(0, MIX_MAX_VOLUME/6);
+#endif
 	i = 0;
 	while(background_musics[i] != NULL)
 	{
-		loadSound(background_musics[i]);
-		if ((background_musics[i]->fin != NULL)
-			|| (background_musics[i]->fd != NULL))
+		int rv;
+		
+		rv = loadSound(background_musics[i]);
+		if (rv == 0)
 		{
 			play_t *played_music;
 			played_music = malloc(sizeof(play_t));
@@ -546,7 +617,12 @@ void initializeAudio()
 	i = 0;
 	while(effects[i] != NULL)
 	{
-		loadSound(effects[i]);
+		int rv;
+
+		rv = loadSound(effects[i]);
+		if (rv != 0) {
+			fprintf(stderr, "Error: Failed to load sound effect %s.\n", effects[i]->filename);
+		}
 		i++;
 	}
 
@@ -558,7 +634,7 @@ void initializeAudio()
 	//printf("Set format of audsrv (err = %d).\n", ret);
 	audsrv_set_volume(MAX_VOLUME);
 #endif
-#ifdef SDL_MODE
+#ifdef SDL_AUDIO
 	SDL_PauseAudio(0);
 #endif
 #ifdef WII
@@ -609,6 +685,7 @@ void initializeAudio()
 #endif
 }
 
+#ifndef SDL_MIX
 static int readData(play_t *current, unsigned char *buffer, int size)
 {
 	if ((current->effect->loadData)
@@ -643,7 +720,9 @@ static int readData(play_t *current, unsigned char *buffer, int size)
 		return ret;
 	}
 }
+#endif
 
+#ifndef SDL_MIX
 static void resetData(play_t *current)
 {
 	if (current->effect->fin != NULL)
@@ -662,7 +741,9 @@ static void resetData(play_t *current)
 	}
 	current->position = 0;
 }
+#endif
 
+#ifndef SDL_MIX
 static int soundAvailable(sound_t *effect)
 {
 	// Sound is available and can be played, if there is a file open
@@ -719,7 +800,9 @@ static int getNextSound(play_t *current, unsigned char *buffer, int size)
 	else
 		return -1;
 }
+#endif
 
+#ifndef SDL_MIX
 static void getNextAudioData(unsigned char *buffer, int size)
 {
 	int ret;
@@ -797,6 +880,7 @@ static void getNextAudioData(unsigned char *buffer, int size)
 		}
 	}
 }
+#endif
 
 void playAudio()
 {
@@ -849,6 +933,25 @@ void playAudio()
 		writeAudioBuffer = (writeAudioBuffer + 1) % NUMBER_OF_BUFFERS;
 	} else {
 		sceKernelSleepThread();
+	}
+#endif
+#ifdef SDL_MIX
+	if (!Mix_PlayingMusic()) {
+		if (played_current != NULL) {
+			/* play next music. */
+			played_current = played_current->next;
+		}
+		if (played_current == NULL) {
+			/* play first music. */
+			played_current = played_list;
+		}
+		if (played_current != NULL) {
+			if (played_current->effect != NULL) {
+				if (played_current->effect->music != NULL) {
+					Mix_PlayMusic(played_current->effect->music, -1);
+				}
+			}
+		}
 	}
 #endif
 }
@@ -912,10 +1015,24 @@ void pollAudio()
 void startAudio()
 {
 	soundOn = -1;
+#ifdef SDL_MIX
+	if (!Mix_PlayingMusic()) {
+		/* no music ? */
+	} else if (Mix_PausedMusic()) {
+		Mix_ResumeMusic();
+	}
+#endif
 }
 
 void stopAudio()
 {
 	soundOn = 0;
+#ifdef SDL_MIX
+	if (Mix_PlayingMusic()) {
+		if (!Mix_PausedMusic()) {
+			Mix_PauseMusic();
+		}
+	}
+#endif
 }
 

@@ -52,6 +52,12 @@ void Ball::initialize()
 		for (i = 0;  i <= MAX_EXPLOSION; i++)
 		{
 			int size;
+			pixel_t *b;
+			
+			b = tile_start_pixel_access(&explosion[i]);
+			if (b == NULL) {
+				continue;
+			}
 
 			size = explosion[i].w * explosion[i].h;
 			for (j = 0; j < size; j++)
@@ -60,7 +66,7 @@ void Ball::initialize()
 				rgb_color_t rgb;
 				int alpha;
 
-				c = (color_type_t *) &explosion[i].b[j];
+				c = (color_type_t *) &b[j];
 				rgb = getRGBColor(*c);
 #ifdef SDL_MODE
 				alpha = (rgb.r + rgb.g + rgb.b) / 3;
@@ -88,6 +94,7 @@ void Ball::initialize()
 #endif
 				*c = getNativeColor(rgb);
 			}
+			tile_stop_pixel_access(&explosion[i], 0);
 		}
 	}
 	zip = load_tiles("resources/zip.png", MAX_ZIP + 1,
@@ -97,6 +104,12 @@ void Ball::initialize()
 		for (i = 0;  i <= MAX_ZIP; i++)
 		{
 			int size;
+			pixel_t *b;
+
+			b = tile_start_pixel_access(&zip[i]);
+			if (b == NULL) {
+				continue;
+			}
 
 			size = zip[i].w * zip[i].h;
 			for (j = 0; j < size; j++)
@@ -105,7 +118,7 @@ void Ball::initialize()
 				rgb_color_t rgb;
 				int alpha;
 
-				c = (color_type_t *) &zip[i].b[j];
+				c = (color_type_t *) &b[j];
 				rgb = getRGBColor(*c);
 #ifdef PSP
 				alpha = (rgb.r + rgb.g + rgb.b) / 3;
@@ -137,6 +150,7 @@ void Ball::initialize()
 #endif
 				*c = getNativeColor(rgb);
 			}
+			tile_stop_pixel_access(&zip[i], 0);
 		}
 	}
 }
@@ -158,7 +172,9 @@ void Ball::move(int diff_x, int maxx, int maxy)
 {
 	int ball_x_r;
 	int ball_y_r;
+#if 0
 	int check_y;
+#endif
 
 	if (redirCounter != 0)
 	{
@@ -190,6 +206,7 @@ void Ball::move(int diff_x, int maxx, int maxy)
 	{
 		redirectY();
 	}
+#if 0
 	if (y_dir < 0)
 	{
 		check_y = ball_y;
@@ -198,6 +215,7 @@ void Ball::move(int diff_x, int maxx, int maxy)
 	{
 		check_y = ball_y_r;
 	}
+#endif
 }
 
 /**

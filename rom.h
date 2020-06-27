@@ -1,12 +1,24 @@
 #ifndef __ROM_H__
 #define __ROM_H__
 
+#ifdef USE_SDL2
+#include <stdio.h>
+#endif
+
 #define ROM_MAX_FILENAME 200
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#ifdef USE_SDL2
+#define rom_stream_t FILE
+#define rom_open fopen
+#define rom_close fclose
+#define rom_seek fseek
+#define rom_tell ftell
+#define rom_read(fd, buffer, size) fread(buffer, size, 1, fd)
+#else
 typedef struct rom_entry
 {
 	char filename[ROM_MAX_FILENAME];
@@ -29,6 +41,7 @@ int rom_close(rom_stream_t *fd);
 int rom_isFast(rom_stream_t *fd);
 int rom_eof(rom_stream_t *fd);
 rom_entry_t *rom_getFile(const char *filename);
+#endif
 
 #ifdef __cplusplus
 }

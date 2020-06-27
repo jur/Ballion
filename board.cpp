@@ -818,7 +818,9 @@ void Board::checkCollisions()
 {
 	int ball_x;
 	int ball_y;
+#if 0
 	int ball_color;
+#endif
 	int diff_x;
 	int diff_y;
 	int x, y;
@@ -941,7 +943,9 @@ void Board::checkCollisions()
 
 	ball->getPosition(&ball_x, &ball_y);
 	ball->getDifference(&diff_x, &diff_y);
+#if 0
 	ball_color = ball->getColor();
+#endif
 
 	if (diff_x != 0)
 	{

@@ -13,7 +13,6 @@ extern "C" {
 #endif
 
 #include "graphic.h"
-#include "pngloader.h"
 
 #ifdef __cplusplus
 }
@@ -56,13 +55,16 @@ Font::Font(const char *filename, int width, int height, rgb_color_t color, int u
 		{
 			int x;
 			int y;
-			if (font[i].b != NULL)
+			pixel_t *b;
+			
+			b = tile_start_pixel_access(&font[i]);
+			if (b != NULL)
 			{
 				for(x = 0; x < font[i].w; x++)
 				{
 					color_type_t *c;
 
-					c = (color_type_t *) &font[i].b[getGraphicOffset(x, 0, font[i].w)];
+					c = (color_type_t *) &b[getGraphicOffset(x, 0, font[i].w)];
 					if (colorCmp(*c, yellow)
 						|| (useWhite && (colorCmp(*c, white))))
 					{
@@ -77,7 +79,7 @@ Font::Font(const char *filename, int width, int height, rgb_color_t color, int u
 					{
 						color_type_t *c;
 
-						c = (color_type_t *) &font[i].b[getGraphicOffset(x, y, font[i].w)];
+						c = (color_type_t *) &b[getGraphicOffset(x, y, font[i].w)];
 
 						if (colorCmp(*c, yellow)
 							|| colorCmp(*c, magenta)
@@ -90,6 +92,7 @@ Font::Font(const char *filename, int width, int height, rgb_color_t color, int u
 						}
 					}
 				}
+				tile_stop_pixel_access(&font[i], 0);
 			}
 			else
 				printf("Char: %d is NULL\n", i);
@@ -108,11 +111,13 @@ int Font::putc(int x, int y, int c)
 	if (c > LAST_CHAR)
 		c = FIRST_CHAR;
 	c -= FIRST_CHAR;
+	if (font != NULL) {
 #if defined(USE_OPENGL) && defined(SDL_MODE)
-	put_image_textured(x, y, &font[c], 8, font[c].w * FONT_ZOOM_FACTOR, font[c].h * FONT_ZOOM_FACTOR, 1);
+		put_image_textured(x, y, &font[c], 8, font[c].w * FONT_ZOOM_FACTOR, font[c].h * FONT_ZOOM_FACTOR, 1);
 #else
-	put_image(x, y, &font[c], 8, 1);
+		put_image(x, y, &font[c], 8, 1);
 #endif
+	}
 	//printf("charwidth %d %c: %d, w %d h %d\n", c, c, charwidth[c], font[c].w, font[c].h);
 	return charwidth[c];
 }

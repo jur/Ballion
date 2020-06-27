@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 #include <SDL.h>
-#ifndef USE_WASM
+#ifdef USE_SDL_FRAMERATE
 #include <SDL_gfxBlitFunc.h>
 #include <SDL_framerate.h>
 #endif
@@ -15,27 +15,24 @@
 #ifdef GLES1
 	#include <EGL/egl.h>
 	#include <GLES/gl.h>
-#ifdef USE_SDL2
-	#include <SDL2/SDL.h>
-	#include <SDL2/SDL_syswm.h>
-#else
-	#include <SDL/SDL.h>
-	#include <SDL/SDL_syswm.h>
-#endif
+	#include <SDL.h>
+	#include <SDL_syswm.h>
 #else
 	#include <GL/gl.h>
-#ifdef USE_SDL2
-	#include <SDL2/SDL.h>
-#else
-	#include <SDL/SDL.h>
+	#include <SDL.h>
 #endif
 #endif
+
+#ifdef SDL_MIX
+#include <SDL_mixer.h>
 #endif
 
 #include "graphic.h"
 #include "config.h"
 #include "audio.h"
+#ifndef USE_SDL2
 #include "pngloader.h"
+#endif
 #include "pad.h"
 #include "gamecontrol.h"
 #include "utils.h"
@@ -65,8 +62,7 @@
 #define COLOURDEPTH_DEPTH_SIZE		16
 #endif
 
-SDL_Surface *screen;
-#ifndef USE_WASM
+#ifdef USE_SDL_FRAMERATE
 FPSmanager manex;
 #endif
 
@@ -192,11 +188,22 @@ static void TerminateOpenGL()
 }
 #endif
 
+#ifdef USE_SDL2
 void flip_buffers(void)
 {
 	pollAudio();
 
-#ifndef USE_WASM
+	SDL_RenderPresent(sdlRenderer);
+#if 0
+	SDL_Delay(100); // TBD.
+#endif
+}
+#else
+void flip_buffers(void)
+{
+	pollAudio();
+
+#ifdef USE_SDL_FRAMERATE
 	SDL_framerateDelay(&manex);
 #endif
 
@@ -215,11 +222,19 @@ void flip_buffers(void)
 	SDL_Flip(screen);
 #endif
 }
+#endif
 
+#ifdef USE_SDL2
+void drawBackground(void)
+{
+	SDL_RenderClear(sdlRenderer);
+}
+#else
 void drawBackground(void)
 {
 	SDL_FillRect(screen, NULL, SDL_MapRGB(screen->format, 0, 0, 0));
 }
+#endif
 
 #ifdef USE_OPENGL
 static void setup_2d(void)
@@ -292,6 +307,17 @@ void sync_filesystem(void)
 #endif
 }
 
+static void game_cleanup(void)
+{
+#ifdef SDL_AUDIO
+	SDL_CloseAudio();
+#endif
+#ifdef SDL_MIX
+	Mix_Quit();
+#endif
+	SDL_Quit();
+}
+
 void game_setup(void)
 {
 	uint16_t maxx, maxy;
@@ -307,13 +333,33 @@ void game_setup(void)
 	}
   
 	/* When the program is through executing, call SDL_Quit */
-	atexit(SDL_Quit);
+	atexit(game_cleanup);
 
  
 	maxx = get_max_x();
 	maxy = get_max_y();
 
 	/* Grab a surface on the screen */
+#ifdef USE_SDL2
+	//sdlWindow = SDL_CreateWindow("Ballion", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, maxx, maxy, SDL_WINDOW_FULLSCREEN | SDL_WINDOW_OPENGL);
+	sdlWindow = SDL_CreateWindow("Ballion", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, maxx, maxy, SDL_WINDOW_SHOWN);
+	if (sdlWindow == NULL) {
+		fprintf(stderr, "SDL_CreateWindow Error: %s\n", SDL_GetError());
+		exit(-1);
+		return;
+	}
+
+	sdlRenderer = SDL_CreateRenderer(sdlWindow, -1,SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+	if (sdlRenderer == NULL) {
+		fprintf(stderr, "SDL_CreateRenderer Error: %s\n", SDL_GetError());
+		if (sdlWindow != NULL) {
+			SDL_DestroyWindow(sdlWindow);
+		}
+		SDL_Quit();
+		exit(-1);
+		return;
+	}
+#else
 #ifdef PANDORA
 	screen = SDL_SetVideoMode(maxx, maxy, 32,
 		SDL_HWSURFACE|SDL_ANYFORMAT|SDL_DOUBLEBUF | SDL_FULLSCREEN);
@@ -336,9 +382,10 @@ void game_setup(void)
 	SDL_WM_SetCaption("Ballion", "Ballion");
 	SDL_ShowCursor(0);
 
-#ifndef USE_WASM
+#ifdef USE_SDL_FRAMERATE
 	SDL_initFramerate(&manex);
 	SDL_setFramerate(&manex, maxfps);
+#endif
 #endif
 
 #ifdef USE_OPENGL
@@ -359,7 +406,7 @@ void game_exit(void)
 #ifdef USE_OPENGL
 	TerminateOpenGL();
 #endif
-	SDL_CloseAudio();
+	game_cleanup();
 	exit(0);
 }
 

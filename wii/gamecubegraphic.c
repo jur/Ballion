@@ -4,7 +4,9 @@
 
 #include "graphic.h"
 #include "pad.h"
+#ifdef SIMPLE_GRAPHIC_TEST
 #include "pngloader.h"
+#endif
 #include "tiles.h"
 
 /*** FIFO Buffer required for GX ***/

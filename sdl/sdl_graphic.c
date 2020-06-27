@@ -1,26 +1,16 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <SDL.h>
 #ifndef USE_SDL2
-#include <SDL/SDL_rotozoom.h>
+#include <SDL_rotozoom.h>
 #endif
 #ifdef USE_OPENGL
 #ifdef GLES1
 #include <EGL/egl.h>
 #include <GLES/gl.h>
-#ifdef USE_SDL2
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_syswm.h>
-#else
-#include <SDL/SDL.h>
-#include <SDL/SDL_syswm.h>
-#endif
+#include <SDL_syswm.h>
 #else
 #include <GL/gl.h>
-#ifdef USE_SDL2
-#include <SDL2/SDL.h>
-#else
-#include <SDL/SDL.h>
-#endif
 #endif
 #endif
 
@@ -43,9 +33,14 @@
 	} while(0)
 #endif
 
-extern SDL_Surface *screen;
+#ifdef USE_SDL2
+SDL_Window *sdlWindow;
+SDL_Renderer *sdlRenderer;
+#else
+SDL_Surface *screen;
+#endif
 static int padState = 0;
-#ifndef USE_WASM
+#ifndef USE_SDL2
 int maxfps = 80;
 #endif
 
@@ -173,10 +168,22 @@ void check_sdl_events()
 			case SDLK_F1:
 			case SDLK_f:
 				if (event.key.state == SDL_PRESSED) {
+#ifdef USE_SDL2
+					static int fullscreen = 0;
+
+					if (fullscreen) {
+						SDL_SetWindowFullscreen(sdlWindow, 0);
+						fullscreen = 0;
+					} else {
+						SDL_SetWindowFullscreen(sdlWindow, SDL_WINDOW_FULLSCREEN);
+						fullscreen = 1;
+					}
+#else
 					SDL_WM_ToggleFullScreen(screen);
+#endif
 				}
 				break;
-#ifndef USE_WASM
+#ifdef USE_SDL_FRAMERATE
 			case SDLK_RSHIFT:
 				if (maxfps > 0) {
 					maxfps--;
@@ -210,6 +217,7 @@ void check_sdl_events()
 	}
 }
 
+#ifndef USE_SDL2
 static void setpixel(SDL_Surface *dest, int x, int y, uint8_t r, uint8_t g,
 	uint8_t b)
 {
@@ -268,6 +276,7 @@ static void setpixel(SDL_Surface *dest, int x, int y, uint8_t r, uint8_t g,
 		fprintf(stderr, "Error: Unknown bitdepth!\n");
 	}
 }
+#endif
 
 #ifdef USE_OPENGL
 static void load_texture(tile_t * tile, int alpha)
@@ -309,24 +318,21 @@ static void load_texture(tile_t * tile, int alpha)
 		GL_CHECK();
 	} else {
 		printf("SDL could not load \"%s\": %s\n", tile->name, SDL_GetError());
-		SDL_Quit();
 		return;
 	}
 }
 #endif
 
+#ifndef USE_SDL2
 static void paint_image(SDL_Surface *dest, int16_t x, int16_t y, tile_t * tile,
 	int16_t w, int16_t h)
 {
 	int xi, yi;
 	int j;
 	int i;
-
-	/* Lock the dest, if needed */
-	if (SDL_MUSTLOCK(dest)) {
-		if (SDL_LockSurface(dest) < 0)
-			return;
-	}
+	pixel_t *b;
+	
+	b = tile_start_pixel_access(tile);
 
 	i = 0;
 	j = 0;
@@ -337,22 +343,45 @@ static void paint_image(SDL_Surface *dest, int16_t x, int16_t y, tile_t * tile,
 	for (yi = y; yi < (y + h); yi++) {
 		i = j;
 		for (xi = x; xi < (x + w); xi++) {
-			if ((tile->b[i] >> 24) != 0) {
+			if ((b[i] >> 24) != 0) {
 				setpixel(dest, xi, yi,
-					(tile->b[i] >> 0) & 0xFF,
-					(tile->b[i] >> 8) & 0xFF, (tile->b[i] >> 16) & 0xFF);
+					(b[i] >> 0) & 0xFF,
+					(b[i] >> 8) & 0xFF, (b[i] >> 16) & 0xFF);
 			}
 			i++;
 		}
 		j += tile->w;
 	}
 
-	/* Unlock the dest if needed */
-	if (SDL_MUSTLOCK(dest)) {
-		SDL_UnlockSurface(dest);
+	tile_stop_pixel_access(tile, 0);
+}
+#endif
+
+#ifdef USE_SDL2
+void put_image_textured(int16_t x, int16_t y, tile_t *tile, int32_t z,
+	int16_t w, int16_t h, int alpha)
+{
+	(void) z;
+
+	if (tile != NULL) {
+		if (tile->tex != NULL) {
+			SDL_Rect srcrect;
+			SDL_Rect dstrect;
+
+			dstrect.x = x;
+			dstrect.y = y;
+			dstrect.w = w;
+			dstrect.h = h;
+
+			srcrect.x = 0;
+			srcrect.y = 0;
+			srcrect.w = tile->w;
+			srcrect.h = tile->h;
+			SDL_RenderCopy(sdlRenderer, tile->tex, &srcrect, &dstrect);
+		}
 	}
 }
-
+#else
 void put_image_textured(int16_t x, int16_t y, tile_t * tile, int32_t z,
 	int16_t w, int16_t h, int alpha)
 {
@@ -461,8 +490,11 @@ void put_image_textured(int16_t x, int16_t y, tile_t * tile, int32_t z,
 	}
 #endif
 }
+#endif
 
 void put_image(int16_t x, int16_t y, tile_t * tile, int32_t z, int alpha)
 {
-	put_image_textured(x, y, tile, z, tile->w, tile->h, alpha);
+	if (tile != NULL) {
+		put_image_textured(x, y, tile, z, tile->w, tile->h, alpha);
+	}
 }

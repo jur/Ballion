@@ -9,7 +9,6 @@
 #include "graphic.h"
 #include "config.h"
 #include "audio.h"
-#include "pngloader.h"
 #include "pad.h"
 #include "gamecontrol.h"
 #include "gamecubegraphic.h"
